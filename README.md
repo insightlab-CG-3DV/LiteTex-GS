@@ -1,44 +1,16 @@
-# Content-Aware Texturing for Gaussian Splatting
-Panagiotis Papantonakis, Georgios Kopanas, Frédo Durand, George Drettakis<br>
-| [Webpage](https://repo-sam.inria.fr/nerphys/gs-texturing/) | [Full Paper](https://repo-sam.inria.fr/nerphys/gs-texturing/ContentAwareTexturedGaussians-authors.pdf) | [Arxiv](https://arxiv.org/abs/2512.02621) | [Other GRAPHDECO Publications](http://www-sop.inria.fr/reves/publis/gdindex.php) | [NERPHYS project page](https://project.inria.fr/nerphys/) | <br>
-![Teaser image](assets/teaser.png)
+# LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting
 
-This repository contains the code of the paper "Content-Aware Texturing for Gaussian Splatting", which can be found [here](https://repo-sam.inria.fr/nerphys/gs-texturing).
-We also provide the configurations to train the models mentioned in the paper,
-as well as the evaluation script that produces the results.
+![LiteTex-GS teaser](assets/litetex_gs_teaser.png)
 
-The project's code is based on the original 3DGS project that you can find [here](https://github.com/graphdeco-inria/gaussian-splatting).
-Two main differences are that there has been a major refactoring of the `train.py` file that was aimed to increase readability and extensibility and a similar refactoring of the CUDA code, to better match the equations provided in the original paper (vectors treated as columns, instead of rows).
+This repository contains the implementation of **LiteTex-GS**, a fast and lightweight texturing framework for Gaussian Splatting.
+LiteTex-GS decouples high-frequency appearance from the geometric scaffold by assigning compact local textures to Gaussian primitives and progressively allocating higher texture resolution only where reconstruction errors indicate that more capacity is needed.
 
-<a href="https://www.inria.fr/"><img height="100" src="assets/logo_inria.png"> </a>
-<a href="https://univ-cotedazur.eu/"><img height="100" src="assets/logo_uca.png"> </a>
-<a href="https://team.inria.fr/graphdeco/"> <img style="width:90%; padding-right: 15px;" src="assets/logo_graphdeco.png"></a>
+The method uses a global-to-local capacity allocation strategy: a frequency-aware scheduler controls the training resolution, texture-resolution cap, and densification rate, while local error statistics decide which primitives receive additional texture capacity.
+To keep the representation compact, LiteTex-GS further prunes low-utility primitives using contribution- and area-aware criteria and applies a resolution-aware texture update rule for stable optimization after texture growth.
 
-Abstract: *Gaussian Splatting has become the method of choice for 3D reconstruction and real-time rendering of captured real scenes. However, fine appearance details need to be represented as a large number of small Gaussian primitives, which can be wasteful when geometry and appearance exhibit different frequency characteristics. Inspired by the long tradition of texture mapping, we propose to use texture to represent detailed appearance where possible. Our main focus is to incorporate per-primitive texture maps that adapt to the scene in a principled manner during Gaussian Splatting optimization. We do this by proposing a new appearance representation for 2D Gaussian primitives with textures where the size of a texel is bounded by the image sampling frequency and adapted to the content of the input images. We achieve this by adaptively upscaling or downscaling the texture resolution during optimization. In addition, our approach enables control of the number of primitives during optimization based on texture resolution. We show that our approach performs favorably in image quality and total number of parameters used compared to alternative solutions for textured Gaussian primitives.*
+Experiments on standard novel view synthesis benchmarks show that LiteTex-GS maintains competitive rendering quality while reducing both training time and total parameter count compared with existing textured Gaussian baselines.
 
-<section class="section" id="BibTeX">
-  <div class="container is-max-desktop content">
-    <h2 class="title">BibTeX</h2>
-    <pre><code>
-@inproceedings{PapantonakisGSTexturing2025,
-  booktitle = {Eurographics Symposium on Rendering},
-  editor = {Wang, Beibei and Wilkie, Alexander},
-  title = {{Content-Aware Texturing for Gaussian Splatting}},
-  author = {Papantonakis, Panagiotis and Kopanas, Georgios and Durand, Frédo and Drettakis, George},
-  year = {2025},
-  publisher = {The Eurographics Association},
-  ISSN = {1727-3463},
-  ISBN = {978-3-03868-292-9},
-  DOI = {10.2312/sr.20251190}
-}
-</code></pre>
-</div>
-</section>
-
-
-## Funding and Acknowledgments
-
-This work was funded by the European Research Council (ERC) Advanced Grant NERPHYS, number 101141721 [https://project.inria.fr/nerphys](https://project.inria.fr/nerphys). The authors are grateful to the OPAL infrastructure of the Université Côte d'Azur for providing resources and support, as well as Adobe and NVIDIA for software and hardware donations. This work was granted access to the HPC resources of IDRIS under the allocation AD011015561 made by GENCI. F. Durand acknowledges funding from Google, Amazon, and MIT-GIST.
+This codebase builds on the original Gaussian Splatting project and the texturing pipeline from Content-Aware Texturing for Gaussian Splatting.
 
 ## Installation
 

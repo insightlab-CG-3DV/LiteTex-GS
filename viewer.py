@@ -199,6 +199,8 @@ class GaussianViewer(Viewer):
         self.camera = FPSCamera(self.mode, 1297, 840, 47, 0.001, 100)
         self.point_view = TorchImage(self.mode)
         self.monitor = PerformanceMonitor(self.mode, ["Render"], add_other=False)
+        self.last_render_time = 0.0
+        self.monitor_available = True
         self.gmodel_stats = GaussianModelStatistics(self.mode)
 
         if hasattr(self, 'scene'):
@@ -237,9 +239,9 @@ class GaussianViewer(Viewer):
             end.synchronize()
             self.point_view.step(net_image)
             render_time = start.elapsed_time(end)
+            self.last_render_time = render_time
         
         if hasattr(self, 'scene_controls'):
-            # TODO: put in a function
             if self.scene_controls.snap:
                 selected_camera = self.scene_controls.all_cameras_list[self.scene_controls.selected_camera_id]
                 self.camera.origin = selected_camera.camera_center.cpu().numpy()
@@ -252,7 +254,8 @@ class GaussianViewer(Viewer):
                 
             self.scene_controls.step()
         
-        self.monitor.step([render_time])
+        if self.monitor_available:
+            self.monitor.step([render_time])
     
     def show_gui(self):
         with imgui_ctx.begin(f"Point View Settings"):
@@ -279,7 +282,14 @@ class GaussianViewer(Viewer):
                 self.camera.process_keyboard_input()
         
         with imgui_ctx.begin("Performance"):
-            self.monitor.show_gui()
+            if self.monitor_available:
+                try:
+                    self.monitor.show_gui()
+                except AttributeError:
+                    self.monitor_available = False
+                    imgui.text(f"Render: {self.last_render_time:.2f} ms")
+            else:
+                imgui.text(f"Render: {self.last_render_time:.2f} ms")
         
         with imgui_ctx.begin(f"GModel Stats"):
             self.gmodel_stats.show_gui(self.gmodel)

@@ -51,7 +51,6 @@ def fold_images(images: torch.Tensor) -> torch.Tensor:
     # Extend the images to create a square final tensor
     if difference > 0:
         images = torch.cat((images, torch.zeros((difference, *images.shape[1:]), device=images.device)), dim=0)
-    # TODO maybe do it with fold
     return torch.cat([torch.cat([images[j*side+i] for i in range(side)], dim=1) for j in range(side)], dim=0)
 
 def show_texture_maps(texture_maps):

@@ -23,7 +23,10 @@ from plyfile import PlyData, PlyElement
 from utils.sh_utils import SH2RGB
 from scene.gaussian_model import BasicPointCloud
 import torch
-from pytorch3d.ops import sample_farthest_points
+try:
+    from pytorch3d.ops import sample_farthest_points
+except ModuleNotFoundError:
+    sample_farthest_points = None
 
 class CameraInfo(NamedTuple):
     uid: int
@@ -123,8 +126,12 @@ def fetchPly(path, num_pts=500_000):
 
     # Taken from bbsplat
     if len(positions) >= num_pts:
-        _, indices = sample_farthest_points(torch.tensor(positions[None]), K=num_pts)
-        indices = indices[0]
+        if sample_farthest_points is not None:
+            _, indices = sample_farthest_points(torch.tensor(positions[None]), K=num_pts)
+            indices = indices[0].cpu().numpy()
+        else:
+            print("PyTorch3D not found; using random point-cloud downsampling.")
+            indices = np.random.default_rng(0).choice(len(positions), size=num_pts, replace=False)
         positions = positions[indices]
         colors = colors[indices]
         normals = normals[indices]

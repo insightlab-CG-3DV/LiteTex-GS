@@ -158,7 +158,6 @@ class JaggedTensor:
     # Function that takes as input either a JaggedTensor of the exact same sizes and adds the corresponding elements
     # or a normal tensor with dimensions (n_internal_tensors, data_dimensionality)
     # and for each element, it adds it to the entire, corresponding interal tensor
-    # TODO: Optionally give an activation function. Maybe add it to the whole class? I dunno
     def add(self, other: torch.Tensor | Self, activation_fn: Callable[[torch.Tensor], torch.Tensor] = lambda x: x):
         cloned_tensor = self.clone()
         if isinstance(other, torch.Tensor):
@@ -189,7 +188,6 @@ class JaggedTensor:
         new_jagged = JaggedTensor(self._sizes.clone(), self._values.clone())
         return new_jagged
     
-    # TODO The activation function shouldn't be necessary (helpful for debugging, but not necessary)
     def generate_downscaled_reconstructed_maps(self, mask: torch.Tensor, activation_fn: Callable[[torch.Tensor], torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         try:
             mask = self._convert_mask(mask)

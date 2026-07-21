@@ -19,6 +19,7 @@ def _compute_rasterization_attirbutes(camera, pc, scaling_modifier, pipe, overri
     opacities = pc.get_opacity
     texture_map = pc.get_texture_map
     texture_resolution = pc._texture_map._sizes
+
     texture_map_start_offset = pc._texture_map.start_offsets
     texel_size = pc.texel_size
 
@@ -78,7 +79,8 @@ def render(viewpoint_camera,
            measure_fps=False,
            texture_debug_view=False,
            colour_type="full",
-           mask=None):
+           mask=None,
+           render_size=None):
     """
     Render the scene. 
     
@@ -125,8 +127,8 @@ def render(viewpoint_camera,
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
 
     raster_settings = GaussianRasterizationSettings(
-        image_height=int(viewpoint_camera.image_height),
-        image_width=int(viewpoint_camera.image_width),
+        image_height=int(viewpoint_camera.image_height) if render_size is None else int(render_size[0]),
+        image_width=int(viewpoint_camera.image_width) if render_size is None else int(render_size[1]),
         tanfovx=tanfovx,
         tanfovy=tanfovy,
         bg=bg_color,

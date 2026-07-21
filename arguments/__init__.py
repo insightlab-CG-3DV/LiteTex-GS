@@ -45,7 +45,6 @@ class ParamGroup:
         return group
 
 class ModelParams(ParamGroup):
-    # TODO model_args should be renamed/split/erased
     def __init__(self, parser, sentinel=False):
         self.sh_degree = 3
         self._source_path = ""
@@ -70,6 +69,23 @@ class PipelineParams(ParamGroup):
         self.convert_SHs_python = False
         self.compute_cov3D_python = False
         self.debug = False
+        # DashGaussian defaults
+        self.resolution_mode = "freq"  # scheduler on by default
+        self.densify_mode = "freq"
+        self.max_n_gaussian = -1
+        # Resolution scheduler controls
+        self.max_reso_scale = 8
+        self.reso_sample_num = 32
+        self.start_significance_factor = 4
+        # Warmup controls
+        self.reso_warmup_iters = 0
+        self.texture_warmup_iters = 500
+        self.texture_resolution_mode = "freq"
+        # Allow texture training before full-res rendering
+        self.allow_texture_low_res = True
+        # Logging
+        self.log_psnr = False
+        self.log_psnr_interval = 10
         super().__init__(parser, "Pipeline Parameters")
 
 class OptimizationParams(ParamGroup):
@@ -78,28 +94,53 @@ class OptimizationParams(ParamGroup):
         self.position_lr_init = 0.00016
         self.position_lr_final = 0.0000016
         self.position_lr_delay_mult = 0.01
-        self.position_lr_max_steps = 30_000
+        self.position_lr_max_steps = 24_000
         self.feature_lr = 0.0025
         self.texture_map_lr = 0.0007
+        # Resolution-aware texture LR scaling (effective LR grows with map area).
+        self.texture_lr_base_res = 2
+        self.texture_lr_res_scale_power = 0.5
+        self.texture_lr_res_scale_max = 4.0
         self.opacity_lr = 0.05
         self.scaling_lr = 0.005
         self.rotation_lr = 0.001
         self.percent_dense = 0.01
         self.lambda_dssim = 0.2
+        # Optional extra MSE term to better align optimization with PSNR (default off)
+        self.lambda_l2 = 0.0
 
         self.max_texture_resolution = 256
-        self.adaptive_texelsize_percentile = 0.9
+        self.adaptive_texelsize_percentile = 0.5
         self.downscale_threshold = 0.02
+        # Pruning aggressiveness (opacity threshold). Higher -> more aggressive pruning.
+        self.prune_opacity_threshold = 0.02
+        # Target pruning threshold late in training (ramped from start threshold)
+        self.prune_opacity_threshold_final = 0.05
+        # Post-split pruning floor. A hard minimum opacity used immediately after splitting.
+        # Default matches prior behavior (10/255 ~= 0.0392). Lower this for thin-structure scenes (e.g. stump)
+        # where newly split primitives may start with lower opacity and would otherwise get removed.
+        self.prune_post_split_opacity_floor = 10/255
+        # Periodic hard-prune settings after densification
+        self.prune_hard_interval = 800
+        self.prune_hard_factor = 1.7
+        # Contribution/visibility-based pruning
+        self.prune_contrib_threshold = 1e-5
+        self.prune_area_threshold = 1e-4
+        # Number of consecutive prune-check cycles a primitive can stay low-contrib before forced removal
+        self.prune_low_contrib_patience = 3
 
         # Regularisations
         self.lambda_alpha_regul = 0.01
         self.lambda_texture_regul = 0.00000001
+        # Cap compute for texture regularization (prevents OOM when texels explode).
+        # If <= 0, compute on all texels (may OOM on large runs).
+        self.texture_regul_max_texels = 2_000_000
 
         # Densification
         self.splitting_threshold = 32
         self.densification_interval = 250
         self.densify_from_iter = 500
-        self.densify_until_iter = 25_000
+        self.densify_until_iter = 19_000
         self.random_background = False
         self.lambda_mercy = 1.
         self.batch_size = 1

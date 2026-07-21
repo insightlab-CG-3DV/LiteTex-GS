@@ -35,8 +35,6 @@ class ErrorStats:
 
 @torch.no_grad()
 def compute_view_error_stats(gaussians, background, pipeline, camera):
-    # TODO fix this abomination (some circular dependency issues that I didn't have 
-    # the mental fortitude to solve at a specific point in time)
     from utils.loss_utils import ssim
 
     gt_image = camera.original_image

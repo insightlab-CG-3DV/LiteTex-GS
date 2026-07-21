@@ -29,7 +29,7 @@ setup(
             "rasterize_points.cu",
             "ext.cpp"],
             extra_compile_args={
-                "cxx": ['/w'],
+                "cxx": ['-w'],
                 "nvcc": [
                 "-I" + os.path.join(os.path.dirname(os.path.abspath(__file__)), "third_party/glm/"),
                 "--disable-warnings"

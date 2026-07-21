@@ -18,7 +18,34 @@ import os
 from utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import RGB2SH, SH2RGB
-from simple_knn._C import distCUDA2
+try:
+    from simple_knn._C import distCUDA2
+except ImportError:
+    def distCUDA2(points: torch.Tensor, ref_points: int = 4096, chunk_size: int = 1024) -> torch.Tensor:
+        print("simple_knn._C not available; using approximate torch cdist for initial scales.")
+        n_points = points.shape[0]
+        if n_points <= 1:
+            return torch.ones((n_points,), device=points.device, dtype=points.dtype)
+
+        if n_points <= ref_points:
+            dist = torch.cdist(points, points).square()
+            dist.fill_diagonal_(float("inf"))
+            return dist.min(dim=1).values
+
+        ref_idx = torch.randperm(n_points, device=points.device)[:ref_points]
+        refs = points[ref_idx]
+        out = torch.empty((n_points,), device=points.device, dtype=points.dtype)
+        for start in range(0, n_points, chunk_size):
+            end = min(start + chunk_size, n_points)
+            dist = torch.cdist(points[start:end], refs).square()
+            dist[dist == 0] = float("inf")
+            out[start:end] = dist.min(dim=1).values
+
+        fallback = out[torch.isfinite(out)]
+        if fallback.numel() == 0:
+            return torch.ones_like(out)
+        out[~torch.isfinite(out)] = fallback.median()
+        return out
 from utils.graphics_utils import BasicPointCloud
 from utils.general_utils import strip_symmetric, build_scaling_rotation
 from utils.visualisation_utils import gaussian_kernel_2d, fold_images
@@ -85,9 +112,16 @@ class GaussianModel:
         self._texel_size = None
         self._texture_cutoff = texture_cutoff
         self.error_stats = ErrorStats(0)
+
+        # Track how many consecutive prune checks a primitive stays low-contribution
+        self._low_contrib_counter = torch.empty(0, dtype=torch.int32)
+
+        # Spatial LR scale is consumed by the scheduler; default to 1.0 and let the trainer set it later.
+        self.spatial_lr_scale = 1.0
         
 
         self._texel_pixel_ratio = torch.empty(0)
+        self._personal_max_res = torch.empty(0)
         self._pixel_size = torch.empty(0)
         self.setup_functions()
 
@@ -174,7 +208,11 @@ class GaussianModel:
             return world_extent / self.texel_size
         texture_extent = torch.ceil(world_extent / self.texel_size).long()
 
-        max_tex_res = torch.tensor((self._max_texture_resolution, self._max_texture_resolution), device="cuda", dtype=torch.int32)
+        global_max = torch.tensor((self._max_texture_resolution, self._max_texture_resolution), device="cuda", dtype=torch.int32)
+        if hasattr(self, '_personal_max_res') and self._personal_max_res.shape[0] == texture_extent.shape[0]:
+            max_tex_res = torch.min(self._personal_max_res.expand(-1, 2), global_max)
+        else:
+            max_tex_res = global_max
 
         start = torch.floor((max_tex_res - 1) / 2 - texture_extent/2).clamp_min(0)
         end = torch.ceil((max_tex_res - 1) / 2 + texture_extent/2) + 1
@@ -231,6 +269,8 @@ class GaussianModel:
             self.inverse_texture_map_activation(0.000001 * torch.ones([self.num_primitives, 2 * 2, 3], device="cuda")).reshape(-1, 3))
         self._texture_map._values.requires_grad_(True)
         self._texel_pixel_ratio = 1 * torch.ones(self.num_primitives, 1, device="cuda", dtype=torch.int32)
+        self._personal_max_res = 32 * torch.ones((self.num_primitives, 1), device="cuda", dtype=torch.int32)
+        self._low_contrib_counter = torch.zeros(self.num_primitives, 1, device="cuda", dtype=torch.int32)
     
     def construct_list_of_attributes(self, rest_coeffs=45):
         return ['x', 'y', 'z',
@@ -239,9 +279,9 @@ class GaussianModel:
                 'opacity',
                 'scale_0','scale_1',
                 'rot_0','rot_1','rot_2','rot_3',
-                "texel_size"]
+                "texel_size",
+                "personal_max_res"]
 
-    # TODO fixed jagged array save
     def save_ply(self, path: str):
 
         mkdir_p(os.path.dirname(path))
@@ -253,16 +293,17 @@ class GaussianModel:
         scale = self._scaling[:, :2].detach().cpu().numpy()
         rotation = self._rotation.detach().cpu().numpy()
         texel_size = self.texel_size.detach().cpu().numpy()
+        personal_max_res = self._personal_max_res.detach().cpu().numpy()
 
-        dtype_full = [(attribute, 'f4') for attribute in self.construct_list_of_attributes()]
+        # Match the number of f_rest_* fields to the actual SH rest coefficient count.
+        dtype_full = [(attribute, 'f4' if attribute != 'personal_max_res' else 'i4') for attribute in self.construct_list_of_attributes(rest_coeffs=f_rest.shape[1])]
 
         elements = np.empty(xyz.shape[0], dtype=dtype_full)
-        attributes = np.concatenate((xyz, f_dc, f_rest, opacities, scale, rotation, texel_size), axis=1)
+        attributes = np.concatenate((xyz, f_dc, f_rest, opacities, scale, rotation, texel_size, personal_max_res), axis=1)
         elements[:] = list(map(tuple, attributes))
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
 
-    # TODO Have a optimizer-less version (GaussianModel self contained)
     def save_texture_maps(self, path: str, optimizer = None, quantize: bool = False):
         
         # Store a texture as tight to the current size as possible
@@ -274,9 +315,8 @@ class GaussianModel:
             texture_map_codebook = generate_codebook(texture_map, self.inverse_texture_map_activation)
             torch.save(texture_map_codebook, os.path.join(path, "texture_map_codebook.pt"))
         else:
-            torch.save(texture_map.cpu(), os.path.join(path, "texture_map.pt"))
+            torch.save({'values': texture_map.cpu(), 'sizes': self._texture_map._sizes.cpu()}, os.path.join(path, "texture_map.pt"))
 
-    # TODO Ugly, fix it
     def quantize_texture_maps(self, codebook: str | Codebook):
         if isinstance(codebook, str):
             codebook = torch.load(os.path.join(codebook))
@@ -322,6 +362,11 @@ class GaussianModel:
         scaling = torch.from_numpy(scaling).cuda()
         rotation = torch.from_numpy(rotation).cuda()
         texel_size = torch.from_numpy(texel_size).cuda()
+        try:
+            personal_max_res = np.asarray(vertex_group["personal_max_res"], dtype=np.int32)[..., np.newaxis]
+            personal_max_res = torch.from_numpy(personal_max_res).cuda()
+        except ValueError:
+            personal_max_res = 32 * torch.ones((xyz.shape[0], 1), device="cuda", dtype=torch.int32)
 
         return {'xyz': xyz,
                 'opacity': opacity,
@@ -330,6 +375,7 @@ class GaussianModel:
                 'scaling': scaling,
                 'rotation': rotation,
                 'texel_size': texel_size,
+                'personal_max_res': personal_max_res,
         }
 
     def load_ply(self, path):
@@ -350,6 +396,7 @@ class GaussianModel:
         scaling = attributes_dict['scaling']
         rotation = attributes_dict['rotation']
         texel_size = attributes_dict['texel_size']
+        personal_max_res = attributes_dict['personal_max_res']
         
         self._xyz = xyz.requires_grad_(True)
         self._features_dc = features_dc.requires_grad_(True)
@@ -360,20 +407,29 @@ class GaussianModel:
         self._texel_size = texel_size
 
         self.active_sh_degree = self.max_sh_degree
+        self._personal_max_res = personal_max_res
+
+        # Reset low-contribution counter for loaded models
+        self._low_contrib_counter = torch.zeros(self.num_primitives, 1, device="cuda", dtype=torch.int32)
 
     def load_texture_maps(self, path: str, quantize: bool = False):
         if quantize:
             texture_map_codebook: Codebook = torch.load(os.path.join(path, "texture_map_codebook.pt"))
             texture_map = texture_map_codebook.evaluate().view(-1, 3)
-            
+            texture_map = self.inverse_texture_map_activation(texture_map)
+            self._texture_map = JaggedTensor(self._calculate_active_texture_resolution(powers_of_two=False).int(), texture_map.cuda())
         else:
-            texture_map = torch.load(os.path.join(path, "texture_map.pt"))
+            texture_map_data = torch.load(os.path.join(path, "texture_map.pt"))
+            if isinstance(texture_map_data, dict) and 'sizes' in texture_map_data:
+                texture_map = texture_map_data['values']
+                sizes = texture_map_data['sizes'].cuda()
+                texture_map = self.inverse_texture_map_activation(texture_map)
+                self._texture_map = JaggedTensor(sizes, texture_map.cuda())
+            else:
+                texture_map = texture_map_data
+                texture_map = self.inverse_texture_map_activation(texture_map)
+                self._texture_map = JaggedTensor(self._calculate_active_texture_resolution(powers_of_two=False).int(), texture_map.cuda())
 
-        # Unactivate texture map values
-        texture_map = self.inverse_texture_map_activation(texture_map)
-        self._texture_map = JaggedTensor(self._calculate_active_texture_resolution(powers_of_two=False).int(), texture_map.cuda())
-
-    # TODO Have a optimizer-less version (GaussianModel self contained)
     def prune_points(self, mask, optimizer):
         valid_points_mask = ~mask
         optimizable_tensors = optimizer._prune_optimizer(valid_points_mask, self._texture_map._sizes)
@@ -392,9 +448,10 @@ class GaussianModel:
         self.error_stats.contributions = self.error_stats.contributions[valid_points_mask]
 
         self._texel_pixel_ratio = self._texel_pixel_ratio[valid_points_mask]
+        self._personal_max_res = self._personal_max_res[valid_points_mask]
         self._texture_map._sizes = self._texture_map._sizes[valid_points_mask]
+        self._low_contrib_counter = self._low_contrib_counter[valid_points_mask]
 
-    # TODO Have a optimizer-less version (GaussianModel self contained)
     def densification_postfix(self,
                               optimizer,
                               new_xyz,
@@ -424,7 +481,11 @@ class GaussianModel:
         self._scaling = optimizable_tensors["scaling"]
         self._rotation = optimizable_tensors["rotation"]
         self._texel_pixel_ratio = torch.cat((self._texel_pixel_ratio, self._texel_pixel_ratio[densification_mask].repeat(repeats, 1)), dim=0)
+        self._personal_max_res = torch.cat((self._personal_max_res, self._personal_max_res[densification_mask].repeat(repeats, 1)), dim=0)
         self._texture_map._sizes = torch.cat((self._texture_map._sizes, new_texture_resolution), dim=0)
+
+        # Newly added primitives start with zero low-contrib count
+        self._low_contrib_counter = torch.cat((self._low_contrib_counter, torch.zeros((new_xyz.shape[0], 1), device="cuda", dtype=torch.int32)), dim=0)
 
 
         # self.error_stats.errors = torch.cat((self.error_stats.errors, torch.zeros((densification_mask.sum(), 1), device="cuda").repeat(repeats, 1)))
@@ -442,11 +503,13 @@ class GaussianModel:
               min_opacity: float,
               extent: float,
               prune_mask: torch.Tensor | None = None):
-        
+        """Combine opacity pruning with optional precomputed mask."""
+
+        base_mask = (self.get_opacity < min_opacity).view(-1)
         if isinstance(prune_mask, torch.Tensor):
-            prune_mask = torch.logical_or(prune_mask.view(-1), (self.get_opacity < min_opacity).view(-1))
+            prune_mask = torch.logical_or(prune_mask.view(-1), base_mask)
         else:
-            prune_mask = (self.get_opacity < min_opacity).view(-1)
+            prune_mask = base_mask
         self.prune_points(prune_mask, optimizer)
 
     def produce_clusters(self, num_clusters=256, store_dict_path=None):
@@ -475,7 +538,6 @@ class GaussianModel:
     @torch.no_grad()
     # Decreases the texel_pixel ratio of the selected primitives,
     # resulting in a upsampling of the texture
-    # TODO Have a optimizer-less version (GaussianModel self contained)
     def increase_texture_resolution(self, optimizer, selection_mask: torch.Tensor, factor=2):
         new_texture_resolution = self._texture_map._sizes.clone()
         new_texture_resolution[selection_mask] *= factor
@@ -515,7 +577,6 @@ class GaussianModel:
         self._texture_map._sizes = new_texture_map._sizes
 
     @torch.no_grad()
-    # TODO Have a optimizer-less version (GaussianModel self contained)
     def decrease_texture_resolution(
         self,
         optimizer,
@@ -547,8 +608,11 @@ class GaussianModel:
              reconstructed) = self._texture_map.generate_downscaled_reconstructed_maps(curr_mask, self.texture_map_activation)
             
             # Store the downsampled version in case we use it
-            downsampled_texture_map._values[downsampled_jagged_mask] = self.inverse_texture_map_activation(downscaled.reshape(-1, 3))
-
+            try:
+                downsampled_texture_map._values[downsampled_jagged_mask] = self.inverse_texture_map_activation(downscaled.reshape(-1, 3))
+            except RuntimeError:
+                loss[curr_downsampled_mask_boolean] = 999.0
+                continue
             difference = (reconstructed - original).mean(dim=-1)
 
             # We also weight the maps with the falloff value that they encounter
@@ -711,7 +775,6 @@ class GaussianModel:
         self._texel_pixel_ratio.clamp_min_(1)
 
     @torch.no_grad()
-    # TODO Have a optimizer-less version (GaussianModel self contained)
     def texture_map_resize(self, optimizer, powers_of_two: bool = True):
         """Checks if texture map needs resizing by computing the new resolutions and calling the resizing CUDA kernel"""
 
@@ -724,13 +787,33 @@ class GaussianModel:
 
         new_texture_map._values.nan_to_num_(0, 0, 0)
 
+        # GET OLD STATES
+        optim = optimizer.optimizer
+        old_param = self._texture_map._values
+        stored_state = optim.state.get(old_param, None)
+        
+        has_state = stored_state is not None and "exp_avg" in stored_state
+
+        if has_state:
+            exp_avg_map = JaggedTensor(self._texture_map._sizes, stored_state["exp_avg"].clone())
+            exp_avg_sq_map = JaggedTensor(self._texture_map._sizes, stored_state["exp_avg_sq"].clone())
+            
+            new_exp_avg_map = JaggedTensor(new_texture_map._sizes.clone(), torch.zeros_like(new_texture_map._values))
+            new_exp_avg_map.central_crop(exp_avg_map)
+            
+            new_exp_avg_sq_map = JaggedTensor(new_texture_map._sizes.clone(), torch.zeros_like(new_texture_map._values))
+            new_exp_avg_sq_map.central_crop(exp_avg_sq_map)
+
         self._texture_map._values = optimizer.replace_tensor_to_optimizer(
             new_texture_map._values,
             "texture_map",
-            (
-                self._texture_map.create_jagged_mask(~update_mask),
-                new_texture_map.create_jagged_mask(~update_mask)
-            )
+            None # Let it zero out, we will overwrite ALL of it
             )["texture_map"]
+
+        if has_state:
+            new_param = self._texture_map._values
+            optim.state[new_param]["exp_avg"] = new_exp_avg_map._values
+            optim.state[new_param]["exp_avg_sq"] = new_exp_avg_sq_map._values
+
         self._texture_map._sizes = new_texture_map._sizes
         torch.cuda.empty_cache()

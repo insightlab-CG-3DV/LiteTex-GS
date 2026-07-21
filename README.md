@@ -19,19 +19,19 @@ Make sure that submodules are also checkout out by adding the `--recursive` flag
 
 ```shell
 # SSH
-git clone git@github.com:graphdeco-inria/gs-texturing.git --recursive
+git clone git@github.com:insightlab-CG-3DV/LiteTex-GS.git --recursive
 ```
 or
 ```shell
 # HTTPS
-git clone https://github.com/graphdeco-inria/gs-texturing --recursive
+git clone https://github.com/insightlab-CG-3DV/LiteTex-GS.git --recursive
 ```
 
 ### Create and set up the environment
 Create a conda environment with:
 ```shell
-conda create -n gs_texturing python=3.12
-conda activate gs_texturing
+conda create -n lite_tex python=3.12
+conda activate lite_tex
 ```
 
 Run the installation script that should take care of everything

@@ -53,29 +53,6 @@ python train.py -s <PATH TO COLMAP DATASET> -m <OUTPUT_DIR>
 
 This work has introduced some new hyperparameters that may need to be tuned depending on the dataset and available system resources (e.g. memory). Below is a comprehensive list, with intuition on what the expected effect of each one is. A comparison is provided in **Appendix B** of the paper.
 <details>
-<summary>Newly Added Hyperparameters</summary>
-
-```
---max_texture_resolution (default: 256)
-
-Controls the maximum texture resolution for each individual primitive's texture. A higher value means that primitives can potentially carry more texels, becoming more expressive, at the cost of memory.
-
---adaptive_texelsize_percentile (default 0.9)
-
-Controls how many primitives will be allowed to upscale and densify each densification cycle. A lower value means that more primitives will be potentially upscaled and densified, leading to a more aggressive behaviour, at the cost of higher peak memory usage.
-
---downscale_threshold (default 0.02)
-
-Controls the threshold below which primitives get downscaled. A high value means more aggressive downscaling, which can lead to oversimplified textures and no splitting. A low value has the opposite effect which can increase the memory usage.
-
---lambda_texture_regul (default: 0.00000001)
-
-Controls how strong the texture regulariser is. A low value will lead to textures that may train more quickly, but at the risk of overfitting, which will impede them from getting downscaled, leading to high memory usage. A high value has the opposite effect, with textures not being allowed to learn easily, leading to primitives with simpler textures.
-
---splitting_threshold (default: 32)
-
-The smallest texture resolution threshold, that controls splitting. A low value means primitives split more easily, which can have the effect of spawning too many primitives, removing the need of textures. A high value has the opposite effect, with primitives needing more upscaling cycles to be split, if ever.
-```
 
 </details>
 

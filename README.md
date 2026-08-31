@@ -21,8 +21,6 @@ To address these challenges, we propose **LiteTex-GS**, a fast and lightweight t
 
 **Figure 1.** Left: Qualitative comparison on a representative Mip-NeRF 360 scene. Two zoom-in regions compare LiteTex-GS mainly with CAT, with ground truth as reference; the average training time and total parameter count on Mip-NeRF 360 are annotated below each method. Right: Quality-efficiency trade-off in terms of PSNR, training time, and parameter count. LiteTex-GS maintains competitive visual fidelity while substantially reducing both parameters and training time through global-to-local capacity allocation.
 
-This codebase builds on the original Gaussian Splatting project and the texturing pipeline from Content-Aware Texturing for Gaussian Splatting.
-
 ## Installation
 
 ### Clone the repository

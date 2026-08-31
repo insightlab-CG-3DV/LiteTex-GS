@@ -2,7 +2,6 @@
 
 > Zhiwei Li<sup>†</sup>, Yijia Guo<sup>†</sup>, Yishi Lu, Liwen Hu, Hong Rao<sup>*</sup>, Shengbo Chen<sup>*</sup>, Lei Ma<sup>*</sup>
 >
-> <sup>†</sup>Equal contribution &nbsp;&nbsp; <sup>*</sup>Corresponding authors
 
 This repository contains the official implementation associated with the paper **"LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting"**, accepted to the **Pacific Graphics 2026 Journal Track** and published in *Computer Graphics Forum*.
 
@@ -20,7 +19,7 @@ To address these challenges, we propose **LiteTex-GS**, a fast and lightweight t
 
 ![LiteTex-GS overview](assets/litetex_gs_teaser_hd.png)
 
-**Figure 1.** Left: Qualitative comparison on a representative Mip-NeRF 360 scene. Two zoom-in regions compare LiteTex-GS mainly with CAT, with ground truth as reference; the average training time and total parameter count on Mip-NeRF 360 are annotated below each method. Right: Quality-efficiency trade-off in terms of PSNR, training time, and parameter count. LiteTex-GS maintains competitive visual fidelity while substantially reducing both parameters and training time through global-to-local capacity allocation. [Download the high-resolution PDF](assets/litetex_gs_teaser.pdf).
+**Figure 1.** Left: Qualitative comparison on a representative Mip-NeRF 360 scene. Two zoom-in regions compare LiteTex-GS mainly with CAT, with ground truth as reference; the average training time and total parameter count on Mip-NeRF 360 are annotated below each method. Right: Quality-efficiency trade-off in terms of PSNR, training time, and parameter count. LiteTex-GS maintains competitive visual fidelity while substantially reducing both parameters and training time through global-to-local capacity allocation.
 
 This codebase builds on the original Gaussian Splatting project and the texturing pipeline from Content-Aware Texturing for Gaussian Splatting.
 

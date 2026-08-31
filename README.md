@@ -1,14 +1,26 @@
-# LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting
+# 🎨 LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting
 
-![LiteTex-GS teaser](assets/litetex_gs_teaser.png)
+> Zhiwei Li<sup>†</sup>, Yijia Guo<sup>†</sup>, Yishi Lu, Liwen Hu, Hong Rao<sup>*</sup>, Shengbo Chen<sup>*</sup>, Lei Ma<sup>*</sup>
+>
+> <sup>†</sup>Equal contribution &nbsp;&nbsp; <sup>*</sup>Corresponding authors
 
-This repository contains the implementation of **LiteTex-GS**, a fast and lightweight texturing framework for Gaussian Splatting.
-LiteTex-GS decouples high-frequency appearance from the geometric scaffold by assigning compact local textures to Gaussian primitives and progressively allocating higher texture resolution only where reconstruction errors indicate that more capacity is needed.
+This repository contains the official implementation associated with the paper **"LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting"**, accepted to the **Pacific Graphics 2026 Journal Track** and published in *Computer Graphics Forum*.
 
-The method uses a global-to-local capacity allocation strategy: a frequency-aware scheduler controls the training resolution, texture-resolution cap, and densification rate, while local error statistics decide which primitives receive additional texture capacity.
-To keep the representation compact, LiteTex-GS further prunes low-utility primitives using contribution- and area-aware criteria and applies a resolution-aware texture update rule for stable optimization after texture growth.
+## 🔥 News
 
-Experiments on standard novel view synthesis benchmarks show that LiteTex-GS maintains competitive rendering quality while reducing both training time and total parameter count compared with existing textured Gaussian baselines.
+- **[2026/08] Congratulations! LiteTex-GS has been accepted to the Pacific Graphics 2026 Journal Track!** The official implementation is available in this repository.
+
+## 📝 Abstract
+
+Gaussian Splatting has enabled real-time novel view synthesis, but its tightly coupled geometry and appearance representation often require a large number of primitives to reproduce high-frequency texture details, leading to substantial memory and optimization costs. Recent textured 2D Gaussian methods alleviate this limitation by attaching texture maps to Gaussian primitives. However, bridging the fundamental structural gap between discrete Gaussians and continuous 2D grids requires complex parameterizations that introduce severe computational overhead. This overhead fundamentally compromises the original efficiency of Gaussian Splatting, making the balance between detailed texturing and computational agility an unresolved challenge.
+
+To address these challenges, we propose **LiteTex-GS**, a fast and lightweight texturing framework for Gaussian Splatting. Our method initializes an extremely compact representation by assigning minimal local texture to each Gaussian and progressively allocates higher resolution only to primitives with significant reconstruction errors. To maintain a streamlined geometric scaffold, we introduce a contribution- and area-aware pruning strategy that eliminates low-utility Gaussians. Furthermore, to mitigate the gradient dilution caused by texture upsampling, we design a resolution-aware update rule that preserves rapid and stable convergence. Extensive experiments on standard novel view synthesis benchmarks demonstrate that our method achieves competitive or superior rendering quality while using substantially fewer parameters and less training time than existing textured Gaussian baselines.
+
+## 👀 Overview
+
+![LiteTex-GS overview](assets/litetex_gs_teaser_hd.png)
+
+**Figure 1.** Left: Qualitative comparison on a representative Mip-NeRF 360 scene. Two zoom-in regions compare LiteTex-GS mainly with CAT, with ground truth as reference; the average training time and total parameter count on Mip-NeRF 360 are annotated below each method. Right: Quality-efficiency trade-off in terms of PSNR, training time, and parameter count. LiteTex-GS maintains competitive visual fidelity while substantially reducing both parameters and training time through global-to-local capacity allocation. [Download the high-resolution PDF](assets/litetex_gs_teaser.pdf).
 
 This codebase builds on the original Gaussian Splatting project and the texturing pipeline from Content-Aware Texturing for Gaussian Splatting.
 
@@ -77,4 +89,19 @@ Additional command line arguments control which model to evaluate or which scene
 The codebase uses the [graphdeco viewer](https://github.com/graphdeco-inria/graphdecoviewer), which is a python based viewer that is very easy to integrate and extend. To view a trained model run the following command
 ```shell
 python viewer.py -m <OUTPUT_DIR> [-s <PATH TO SCENE>] local 30000
+```
+
+## 📄 Citation
+
+If you find this project useful in your research, please consider citing:
+
+```bibtex
+@article{li2026litetexgs,
+  title   = {LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting},
+  author  = {Li, Zhiwei and Guo, Yijia and Lu, Yishi and Hu, Liwen and Rao, Hong and Chen, Shengbo and Ma, Lei},
+  journal = {Computer Graphics Forum},
+  volume  = {45},
+  number  = {7},
+  year    = {2026}
+}
 ```

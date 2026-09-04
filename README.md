@@ -99,6 +99,7 @@ If you find this project useful in your research, please consider citing:
   journal = {Computer Graphics Forum},
   volume  = {45},
   number  = {7},
-  year    = {2026}
+  year    = {2026},
+  doi     = {10.1111/cgf.70637}
 }
 ```

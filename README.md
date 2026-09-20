@@ -1,6 +1,6 @@
 # 🎨 LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting
 
-> Zhiwei Li<sup>†</sup>, Yijia Guo<sup>†</sup>, Yishi Lu, Liwen Hu, Hong Rao<sup>*</sup>, Shengbo Chen<sup>*</sup>, Lei Ma<sup>*</sup>
+> Zhiwei Li<sup>&dagger;</sup>, Yijia Guo<sup>&dagger;</sup>, Yishi Lu, Liwen Hu, Hong Rao<sup>&#42;</sup>, Shengbo Chen<sup>&#42;</sup>, Lei Ma<sup>&#42;</sup>
 >
 
 This repository contains the official implementation associated with the paper **"LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting"**, accepted to the **Pacific Graphics 2026 Journal Track** and published in *Computer Graphics Forum*.

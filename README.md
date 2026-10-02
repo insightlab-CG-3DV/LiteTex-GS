@@ -96,13 +96,12 @@ python viewer.py -m <OUTPUT_DIR> [-s <PATH TO SCENE>] local 30000
 If you find this project useful in your research, please consider citing:
 
 ```bibtex
-@article{li2026litetexgs,
-  title   = {LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting},
-  author  = {Li, Zhiwei and Guo, Yijia and Lu, Yishi and Hu, Liwen and Rao, Hong and Chen, Shengbo and Ma, Lei},
-  journal = {Computer Graphics Forum},
-  volume  = {45},
-  number  = {7},
-  year    = {2026},
-  doi     = {10.1111/cgf.70637}
-}
-```
+@article{10.1111:cgf.70637,
+journal = {Computer Graphics Forum},
+title = {{LiteTex-GS: Fast and Lightweight Texturing for Gaussian Splatting}},
+author = {Li, Zhiwei and Guo, Yijia and Lu, Yishi and Hu, Liwen and Rao, Hong and Chen, Shengbo and Ma, Lei},
+year = {2026},
+publisher = {The Eurographics Association and John Wiley & Sons Ltd.},
+ISSN = {1467-8659},
+DOI = {10.1111/cgf.70637}
+}```
